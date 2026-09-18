@@ -1,0 +1,1 @@
+{"root":["./src/main.ts","./src/types.ts","./src/vite-env.d.ts","./src/network/SocketClient.ts","./src/scenes/GameScene.ts"],"version":"5.9.3"}
