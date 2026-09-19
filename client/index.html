@@ -35,7 +35,7 @@
       padding: 40px 48px;
       text-align: center;
       box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-      min-width: 320px;
+      min-width: 340px;
     }
     .panel h1 {
       margin: 0 0 4px;
@@ -46,7 +46,10 @@
       color: transparent;
     }
     .panel p.tag { margin: 0 0 24px; color: var(--text-dim); font-size: 14px; }
-    #name-input {
+
+    .view.hidden-view { display: none; }
+
+    input[type="text"] {
       width: 100%;
       padding: 12px 14px;
       border-radius: 8px;
@@ -54,24 +57,66 @@
       background: #0e121b;
       color: var(--text);
       font-size: 15px;
-      margin-bottom: 14px;
     }
-    #name-input:focus { outline: 2px solid var(--accent); }
-    #play-btn {
+    input[type="text"]:focus { outline: 2px solid var(--accent); }
+
+    button { font-family: inherit; cursor: pointer; border: none; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    .primary-btn {
       width: 100%;
       padding: 13px;
-      border: none;
       border-radius: 8px;
       background: var(--accent);
       color: #06201d;
       font-weight: 700;
       font-size: 15px;
-      cursor: pointer;
       transition: transform 0.1s ease, background 0.15s ease;
     }
-    #play-btn:hover { background: #5fe0d6; transform: translateY(-1px); }
-    #play-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    #status-line { margin-top: 12px; font-size: 12px; color: var(--text-dim); min-height: 16px; }
+    .primary-btn:hover:not(:disabled) { background: #5fe0d6; transform: translateY(-1px); }
+
+    .secondary-btn {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,0.15);
+      color: var(--text);
+      font-size: 14px;
+      transition: border-color 0.15s ease, background 0.15s ease;
+    }
+    .secondary-btn:hover:not(:disabled) { border-color: var(--accent); background: rgba(78,205,196,0.08); }
+
+    .link-btn {
+      background: none;
+      color: var(--text-dim);
+      font-size: 12px;
+      text-decoration: underline;
+      padding: 4px;
+      margin-top: 10px;
+    }
+    .link-btn:hover { color: var(--text); }
+
+    .divider { display: flex; align-items: center; gap: 10px; margin: 16px 0; color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+    .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: rgba(255,255,255,0.1); }
+
+    .join-row { display: flex; gap: 8px; margin-top: 10px; }
+    .join-row input { flex: 1; text-transform: uppercase; letter-spacing: 0.1em; text-align: center; }
+    .join-row button { width: auto; padding: 12px 18px; }
+
+    #lobby-status, #status-line { margin-top: 12px; font-size: 12px; color: var(--text-dim); min-height: 16px; }
+    #lobby-status.error { color: var(--accent-2); }
+
+    #room-code-display {
+      margin-bottom: 18px; padding: 12px; border-radius: 10px;
+      background: rgba(78,205,196,0.08); border: 1px solid rgba(78,205,196,0.25);
+    }
+    #room-code-display .label { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; }
+    #room-code-display .code { font-size: 24px; font-weight: 700; letter-spacing: 0.15em; color: var(--accent); margin: 4px 0; }
+    #room-code-display .copy-hint { font-size: 11px; color: var(--text-dim); cursor: pointer; text-decoration: underline; }
+    #play-view .primary-btn { margin-top: 14px; }
+    #play-view input[type="text"] { margin-bottom: 0; }
+
     #top-scores { margin-top: 20px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 16px; text-align: left; }
     #top-scores h3 { margin: 0 0 8px; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); text-align: center; }
     #top-scores-list { margin: 0; padding-left: 20px; font-size: 13px; max-height: 130px; overflow-y: auto; }
@@ -124,12 +169,35 @@
     <div class="panel">
       <h1>Orb Clash</h1>
       <p class="tag">Eat orbs. Absorb the small. Avoid the big.</p>
-      <input id="name-input" type="text" maxlength="16" placeholder="Enter a name" />
-      <button id="play-btn">Play</button>
-      <div id="status-line"></div>
-      <div id="top-scores">
-        <h3>All-Time Top Scores</h3>
-        <ol id="top-scores-list"><li class="dim">Loading...</li></ol>
+
+      <!-- Lobby: pick how you get into an arena -->
+      <div id="lobby-view" class="view">
+        <button id="quickplay-btn" class="primary-btn" disabled>Quick Play</button>
+        <div class="divider">or</div>
+        <button id="create-room-btn" class="secondary-btn" disabled>Create Room</button>
+        <div class="join-row">
+          <input id="join-code-input" type="text" maxlength="6" placeholder="Room code" />
+          <button id="join-room-btn" class="secondary-btn" disabled>Join</button>
+        </div>
+        <div id="lobby-status">Connecting to server...</div>
+
+        <div id="top-scores">
+          <h3>All-Time Top Scores</h3>
+          <ol id="top-scores-list"><li class="dim">Loading...</li></ol>
+        </div>
+      </div>
+
+      <!-- Play: shown once a room has been assigned -->
+      <div id="play-view" class="view hidden-view">
+        <div id="room-code-display">
+          <div class="label">Room Code</div>
+          <div class="code" id="room-code-text">------</div>
+          <div class="copy-hint" id="copy-code-btn">Click to copy</div>
+        </div>
+        <input id="name-input" type="text" maxlength="16" placeholder="Enter a name" />
+        <button id="play-btn" class="primary-btn">Play</button>
+        <div id="status-line"></div>
+        <button id="back-to-lobby-btn" class="link-btn">&larr; Choose a different room</button>
       </div>
     </div>
   </div>
