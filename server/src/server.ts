@@ -2,8 +2,8 @@ import express from 'express';
 import http from 'http';
 import cors from 'cors';
 import { Server } from 'socket.io';
-import { GameRoom } from './game/GameRoom';
-import { InputPacket, JoinPacket } from './types';
+import { RoomManager } from './game/RoomManager';
+import { CreateRoomResponse, InputPacket, JoinPacket, JoinRoomResponse, QuickPlayResponse } from './types';
 import { connectMongo } from './db/mongo';
 import { getTopScores } from './services/leaderboardService';
 
@@ -27,26 +27,63 @@ const io = new Server(httpServer, {
   cors: { origin: CLIENT_ORIGIN, methods: ['GET', 'POST'] },
 });
 
-const room = new GameRoom(io);
-room.start();
+const roomManager = new RoomManager(io);
 
 io.on('connection', (socket) => {
-  let joined = false;
+  // Each connection can only ever be in one room at a time. These are
+  // per-connection closure state, not shared across sockets.
+  let roomCode: string | null = null;
+  let joinedGame = false;
+
+  socket.on('quickPlay', (_data: unknown, callback: (res: QuickPlayResponse) => void) => {
+    if (roomCode) return;
+    const code = roomManager.findOrCreateRoomForQuickPlay();
+    socket.join(code);
+    roomCode = code;
+    callback({ roomCode: code });
+  });
+
+  socket.on('createRoom', (_data: unknown, callback: (res: CreateRoomResponse) => void) => {
+    if (roomCode) return;
+    const code = roomManager.createRoom();
+    socket.join(code);
+    roomCode = code;
+    callback({ roomCode: code });
+  });
+
+  socket.on('joinRoom', (data: { code?: string }, callback: (res: JoinRoomResponse) => void) => {
+    if (roomCode) return;
+    const requestedCode = (data?.code ?? '').trim().toUpperCase();
+    if (!requestedCode) {
+      callback({ error: 'Enter a room code' });
+      return;
+    }
+    const result = roomManager.joinRoomByCode(requestedCode);
+    if (!result.ok) {
+      callback({ error: result.error });
+      return;
+    }
+    socket.join(requestedCode);
+    roomCode = requestedCode;
+    callback({ roomCode: requestedCode });
+  });
 
   socket.on('join', (packet: JoinPacket) => {
-    if (joined) return;
-    joined = true;
+    if (!roomCode || joinedGame) return;
+    const room = roomManager.getRoom(roomCode);
+    if (!room) return;
+    joinedGame = true;
     room.addPlayer(socket.id, packet?.name ?? 'Anon');
   });
 
   socket.on('input', (packet: InputPacket) => {
-    if (!joined) return;
+    if (!roomCode || !joinedGame) return;
     if (typeof packet?.targetX !== 'number' || typeof packet?.targetY !== 'number') return;
-    room.setPlayerTarget(socket.id, packet.targetX, packet.targetY);
+    roomManager.getRoom(roomCode)?.setPlayerTarget(socket.id, packet.targetX, packet.targetY);
   });
 
   socket.on('disconnect', () => {
-    room.removePlayer(socket.id);
+    if (roomCode) roomManager.handleDisconnect(roomCode, socket.id);
   });
 });
 
