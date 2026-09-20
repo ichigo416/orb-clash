@@ -32,6 +32,11 @@ import {
  *   entity is packed into the same cell, but that's a known, documented
  *   tradeoff — a quadtree would adapt to uneven density better, at the
  *   cost of more complex insert/query logic.
+ * - One GameRoom = one isolated arena. It's constructed with a unique
+ *   `code` and broadcasts only to that socket.io room (`io.to(code)`),
+ *   so multiple arenas run concurrently in the same process without
+ *   seeing each other's state. RoomManager.ts owns the set of active
+ *   GameRooms and the lobby logic for getting players into one.
  */
 export class GameRoom {
   private players = new Map<string, Player>();
@@ -44,9 +49,13 @@ export class GameRoom {
   private orbGrid = new SpatialGrid<Orb>(GRID_CELL_SIZE);
   private playerGrid = new SpatialGrid<Player>(GRID_CELL_SIZE);
 
-  constructor(io: Server) {
+  constructor(io: Server, public readonly code: string) {
     this.io = io;
     this.spawnOrbsUpTo(MAX_ORBS);
+  }
+
+  getPlayerCount(): number {
+    return this.players.size;
   }
 
   start() {
@@ -183,7 +192,7 @@ export class GameRoom {
       by: by.id,
       byName: by.name,
     };
-    this.io.emit('elimination', event);
+    this.io.to(this.code).emit('elimination', event);
     void recordScore(eliminated.name, eliminated.score);
     // Respawn after a short delay so death feels final but not punishing.
     setTimeout(() => this.respawn(eliminated), 1500);
@@ -208,6 +217,6 @@ export class GameRoom {
       players: [...this.players.values()].map((p) => p.toState()),
       orbs: [...this.orbs.values()].map((o) => o.toState()),
     };
-    this.io.emit('snapshot', snapshot);
+    this.io.to(this.code).emit('snapshot', snapshot);
   }
 }
