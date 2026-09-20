@@ -26,6 +26,7 @@ const INPUT_SEND_INTERVAL_MS = 50; // ~20Hz, matches server tick rate
 export class GameScene extends Phaser.Scene {
   private socket!: SocketClient;
   private playerName: string = 'Anon';
+  private roomCode: string = '';
   private myId?: string;
 
   private playerEntities = new Map<string, RenderEntity>();
@@ -38,17 +39,19 @@ export class GameScene extends Phaser.Scene {
     super('GameScene');
   }
 
-  init(data: { socket: SocketClient; name: string }) {
+  init(data: { socket: SocketClient; name: string; roomCode: string }) {
     this.socket = data.socket;
     this.playerName = data.name;
+    this.roomCode = data.roomCode;
   }
 
-      create() {
+  create() {
     this.myId = this.socket.id;
 
     this.cameras.main.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
 
     this.drawWorldBackground();
+    this.updateHud();
 
     this.socket.onSnapshot((snapshot) => this.handleSnapshot(snapshot));
     this.socket.onElimination((event) => this.handleElimination(event));
@@ -56,6 +59,11 @@ export class GameScene extends Phaser.Scene {
     this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => this.handlePointerMove(pointer));
 
     this.socket.join(this.playerName);
+  }
+
+  private updateHud() {
+    const hud = document.getElementById('hud');
+    if (hud) hud.textContent = `Room: ${this.roomCode}`;
   }
 
   private drawWorldBackground() {

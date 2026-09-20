@@ -1,5 +1,13 @@
 import { io, Socket } from 'socket.io-client';
-import { EliminationEvent, GameSnapshot, InputPacket, JoinPacket } from '../types';
+import {
+  CreateRoomResponse,
+  EliminationEvent,
+  GameSnapshot,
+  InputPacket,
+  JoinPacket,
+  JoinRoomResponse,
+  QuickPlayResponse,
+} from '../types';
 import { SERVER_URL } from '../config';
 
 export class SocketClient {
@@ -8,6 +16,28 @@ export class SocketClient {
   constructor() {
     this.socket = io(SERVER_URL, { transports: ['websocket'] });
   }
+
+  // --- Lobby: exactly one of these should be called, before join() ---
+
+  quickPlay(): Promise<QuickPlayResponse> {
+    return new Promise((resolve) => {
+      this.socket.emit('quickPlay', {}, (res: QuickPlayResponse) => resolve(res));
+    });
+  }
+
+  createRoom(): Promise<CreateRoomResponse> {
+    return new Promise((resolve) => {
+      this.socket.emit('createRoom', {}, (res: CreateRoomResponse) => resolve(res));
+    });
+  }
+
+  joinRoom(code: string): Promise<JoinRoomResponse> {
+    return new Promise((resolve) => {
+      this.socket.emit('joinRoom', { code }, (res: JoinRoomResponse) => resolve(res));
+    });
+  }
+
+  // --- Gameplay: only valid after one of the lobby calls above resolves ---
 
   join(name: string) {
     const packet: JoinPacket = { name };
